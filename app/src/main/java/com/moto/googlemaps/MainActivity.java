@@ -1,14 +1,20 @@
 package com.moto.googlemaps;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.location.Location;
+import android.location.LocationManager;
 import android.os.Bundle;
+import android.os.Looper;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationCallback;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -27,6 +33,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     GoogleMap mapa;
     private FusedLocationProviderClient fusedLocationClient;
     Polyline ruta;
+    private LocationCallback locationCallback;
 
     // https://maps.googleapis.com/maps/api/directions/json?origin=20.140396,%20-101.150549&destination=20.169192,%20-101.182198&key=AIzaSyBHtYD_i3eqYqdCroUTQDwzb5FtqD323oc
 
@@ -52,30 +59,66 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
             // for ActivityCompat#requestPermissions for more details.
             return;
         }
-        fusedLocationClient.getLastLocation()
-                .addOnSuccessListener(this, new OnSuccessListener<Location>() {
-                    @Override
-                    public void onSuccess(Location location) {
-                        if (location != null) {
-                            mapa.clear();
-                            LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
-                            mapa.addMarker(new MarkerOptions()
-                                    .position(currentPosition)
-                                    .title("Marker in Sydney"));
-                            CameraPosition cameraPosition = CameraPosition.builder()
-                                    .target(new LatLng(location.getLatitude(), location.getLongitude()))
-                                    .zoom(20)
-                                    .build();
 
-                            mapa.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
-                            Polyline polyline1 = mapa.addPolyline(new PolylineOptions()
-                                    .clickable(true)
-                                    .add(
-                                            new LatLng(location.getLatitude(), location.getLongitude())
-                                    ));
-                        }
-                    }
-                });
+        locationCallback = new LocationCallback() {
+            @Override
+            public void onLocationResult(@NonNull LocationResult locationResult) {
+                super.onLocationResult(locationResult);
+                if(locationResult == null) {
+                    return;
+                }
+                Location lastLocation = null;
+                for(Location location : locationResult.getLocations()) {
+                    lastLocation = location;
+                }
+                mapa.clear();
+                LatLng currentPosition = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+                mapa.addMarker(new MarkerOptions()
+                        .position(currentPosition)
+                        .title("Current Position"));
+                CameraPosition cameraPosition = CameraPosition.builder()
+                        .target(new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude()))
+                        .zoom(20)
+                        .build();
+
+                mapa.animateCamera(CameraUpdateFactory.newCameraPosition(cameraPosition));
+                Polyline polyline1 = mapa.addPolyline(new PolylineOptions()
+                        .clickable(true)
+                        .add(
+                                new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude())
+                        ));
+            }
+        };
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        startLocationUpdates();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        stopLocationUpdates();
+    }
+
+    private void startLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            // TODO: Consider calling
+            //    ActivityCompat#requestPermissions
+            // here to request the missing permissions, and then overriding
+            //   public void onRequestPermissionsResult(int requestCode, String[] permissions,
+            //                                          int[] grantResults)
+            // to handle the case where the user grants the permission. See the documentation
+            // for ActivityCompat#requestPermissions for more details.
+            return;
+        }
+        fusedLocationClient.requestLocationUpdates(LocationRequest.create().setFastestInterval(1000), locationCallback, Looper.getMainLooper());
+    }
+
+    private void stopLocationUpdates(){
+        fusedLocationClient.removeLocationUpdates(locationCallback);
     }
 
     @Override
