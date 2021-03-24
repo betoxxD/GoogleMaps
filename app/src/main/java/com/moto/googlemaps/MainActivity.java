@@ -52,6 +52,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     RequestQueue requestQueue;
     Polyline polyadd;
     HashMap<String, String> hm = new HashMap<String, String>();
+    double currentLat, currentLong;
 
     // https://maps.googleapis.com/maps/api/directions/json?origin=20.140396,%20-101.150549&destination=20.169192,%20-101.182198&key=AIzaSyBHtYD_i3eqYqdCroUTQDwzb5FtqD323oc
 
@@ -86,6 +87,8 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     @Override
                     public void onSuccess(Location location) {
                         if(location != null){
+                            currentLat = location.getLatitude();
+                            currentLong = location.getLongitude();
                             objectRequest(location.getLatitude(),location.getLongitude(),20.140396,-101.150549);
                             LatLng currentPosition = new LatLng(location.getLatitude(), location.getLongitude());
                             mapa.addMarker(new MarkerOptions()
@@ -103,7 +106,7 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
     }
 
     private void objectRequest (double lat1, double lo1, double lat2, double lo2) {
-        List<LatLng> listaPuntos = new ArrayList<>();
+        poly = new ArrayList<>();
         Gson gson = new Gson();
         Log.d("HOLI",lat1 + " " + lo1 + " " + lat2 + " " +lo2);
         String url = "https://maps.googleapis.com/maps/api/directions/json?origin="+lat1+",%20"+lo1+"&destination="+lat2+",%20"+lo2+"&key=AIzaSyBHtYD_i3eqYqdCroUTQDwzb5FtqD323oc";
@@ -122,24 +125,15 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                         for(int j = 0; j < jLegs.length(); j++) {
                             jSteps = ((JSONObject)jLegs.get(j)).getJSONArray("steps");
 
-                            for(int k = 0; k <jSteps.length(); j++){
-                                double startLocationLat = 0;
-                                double startLocationLong = 0;
-                                double endLocationLat = 0;
-                                double endLocationLong = 0;
-                                startLocationLat = (double)((JSONObject)((JSONObject)jSteps.get(k)).get("start_location")).get("lat");
-                                startLocationLong = (double)((JSONObject)((JSONObject)jSteps.get(k)).get("start_location")).get("lng");
-                                endLocationLat = (double)((JSONObject)((JSONObject)jSteps.get(k)).get("end_location")).get("lat");
-                                endLocationLong = (double)((JSONObject)((JSONObject)jSteps.get(k)).get("end_location")).get("lng");
-                                LatLng start = new LatLng(startLocationLat,startLocationLong);
-                                LatLng end = new LatLng(endLocationLat,endLocationLong);
-                                listaPuntos.add(start);
-                                listaPuntos.add(end);
+                            for(int k = 0; k <jSteps.length(); k++){
+                                String  location = "";
+                                location = (String) ((JSONObject)((JSONObject)jSteps.get(k)).get("polyline")).get("points");
+                                decodePoly(location);
                             }
                         }
                     }
                     polyadd = mapa.addPolyline(new PolylineOptions().clickable(true)
-                            .addAll(listaPuntos));
+                    .addAll(poly));
                 }catch (Exception ex){
                     Log.d("HOLI",ex.toString());
                 }
@@ -154,14 +148,26 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
         requestQueue.add(jsonObjectRequest);
     }
 
+    List<LatLng> poly;
+
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mapa = googleMap;
+        mapa.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                mapa.clear();
+                MarkerOptions marker1 = new MarkerOptions().position(new LatLng(currentLat,currentLong)).title("Ubicación actual");
+                mapa.addMarker(marker1);
+                MarkerOptions marker = new MarkerOptions().position(new LatLng(latLng.latitude,latLng.longitude)).title("Casa");
+                mapa.addMarker(marker);
+                objectRequest(currentLat,currentLong,latLng.latitude,latLng.longitude);
+            }
+        });
     }
 
-    private List<LatLng> decodePoly(String encoded) {
+    private void decodePoly(String encoded) {
 
-        List<LatLng> poly = new ArrayList<>();
         int index = 0, len = encoded.length();
         int lat = 0, lng = 0;
 
@@ -189,7 +195,5 @@ public class MainActivity extends AppCompatActivity implements OnMapReadyCallbac
                     (((double) lng / 1E5)));
             poly.add(p);
         }
-
-        return poly;
     }
 }
